@@ -1,0 +1,121 @@
+use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+use keyring::{Entry, Error::NoEntry};
+use rand::{Rng, distr::Alphanumeric};
+use serde::Deserialize;
+use sha2::{Digest, Sha256};
+use std::env;
+use url::Url;
+
+#[derive(Debug, Deserialize)]
+struct GogolResponse {
+    pub access_token: String,
+    pub expires_in: u64,
+    pub scope: String,
+    pub token_type: String,
+}
+
+fn main() {
+    let keyring_entry = Entry::new("yt-randomizer", "token").unwrap();
+
+    dotenvy::dotenv().unwrap();
+
+    let client_id = env::var("CLIENT_ID").unwrap();
+    let client_secret = env::var("CLIENT_SECRET").unwrap();
+    let scopes = [
+        "https://www.googleapis.com/auth/youtubepartner",
+        "https://www.googleapis.com/auth/youtube",
+        "https://www.googleapis.com/auth/youtube.force-ssl",
+    ];
+    let server_uri = "127.0.0.1:8080";
+    let redirect_uri = format!("http://{}", server_uri);
+    let auth_url = "https://accounts.google.com/o/oauth2/v2/auth";
+    let token_url = "https://oauth2.googleapis.com/token";
+
+    let access_token = match keyring_entry.get_password() {
+        Ok(p) => p,
+        Err(NoEntry) => {
+            let code_verifier: String = rand::rng()
+                .sample_iter(&Alphanumeric)
+                .take(128)
+                .map(char::from)
+                .collect();
+            let code_challenge = {
+                let hash = Sha256::digest(code_verifier.as_bytes());
+                URL_SAFE_NO_PAD.encode(hash)
+            };
+
+            println!("code_verifier: {}", code_verifier);
+            println!("code_challenge: {:?}", code_challenge);
+
+            let state: String = rand::rng()
+                .sample_iter(&Alphanumeric)
+                .take(16)
+                .map(char::from)
+                .collect();
+
+            let mut url = Url::parse(auth_url).unwrap();
+            url.query_pairs_mut()
+                .append_pair("client_id", &client_id)
+                .append_pair("redirect_uri", &redirect_uri)
+                .append_pair("response_type", "code")
+                .append_pair("scope", &scopes.join(" "))
+                .append_pair("code_challenge", &code_challenge)
+                .append_pair("code_challenge_method", "S256")
+                .append_pair("state", &state);
+
+            println!("Open this URL in your browser: {}", url);
+
+            let server = tiny_http::Server::http(server_uri).unwrap();
+
+            let (returned_state, code) = loop {
+                let request = server.recv().unwrap();
+
+                let url = Url::parse(&format!("http://localhost{}", request.url())).unwrap();
+                let code = url
+                    .query_pairs()
+                    .find(|(k, _)| k == "code")
+                    .map(|(_, v)| v.to_string());
+                let returned_state = url
+                    .query_pairs()
+                    .find(|(k, _)| k == "state")
+                    .map(|(_, v)| v.to_string());
+
+                if let Some(truc) = code {
+                    let response = tiny_http::Response::from_string("You can close this tab now.");
+                    let _ = request.respond(response);
+                    break (returned_state, truc);
+                }
+            };
+
+            if returned_state.unwrap_or_default() != state {
+                panic!("We got fooled by CSRF!");
+            }
+
+            println!("Authorization code: {:?}", code);
+
+            let client = reqwest::blocking::Client::new();
+            let mut form = std::collections::HashMap::new();
+            form.insert("code", code.as_str());
+            form.insert("client_id", &client_id);
+            form.insert("client_secret", &client_secret);
+            form.insert("redirect_uri", &redirect_uri);
+            form.insert("grant_type", "authorization_code");
+            form.insert("code_verifier", &code_verifier);
+
+            let body: GogolResponse = client
+                .post(token_url)
+                .form(&form)
+                .send()
+                .unwrap()
+                .json()
+                .unwrap();
+
+            keyring_entry.set_password(&body.access_token).unwrap();
+
+            body.access_token
+        },
+        Err(e) => Err(e).unwrap()
+    };
+
+    println!("access_token {access_token}");
+}
