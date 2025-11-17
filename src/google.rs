@@ -1,6 +1,6 @@
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use rand::{Rng, distr::Alphanumeric};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::env;
 use url::Url;
@@ -143,26 +143,34 @@ pub fn perform_oauth(client: &reqwest::blocking::Client) -> String {
     body.access_token
 }
 
-pub fn retreive_playlists(client: &reqwest::blocking::Client, access_token: &str) {
-    let mut body: PlaylistList = client.get("https://www.googleapis.com/youtube/v3/playlists")
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct GetPlaylistParams<'a> {
+    pub part: &'a str,
+    pub mine: &'a str,
+    pub page_token: Option<&'a str>,
+}
+
+fn get_playlist(client: &reqwest::blocking::Client, access_token: &str, page_token: Option<&str>) -> PlaylistList {
+    let params = GetPlaylistParams {
+        part: "snippet",
+        mine: "true",
+        page_token,
+    };
+
+    client.get("https://www.googleapis.com/youtube/v3/playlists")
         .header("Authorization", format!("Bearer {access_token}"))
-        .query(&[
-            ("part", "snippet"),
-            ("mine", "true"),
-        ])
-        .send().unwrap().json().unwrap();
+        .query(&params)
+        .send().unwrap().json().unwrap()
+}
+
+pub fn retreive_playlists(client: &reqwest::blocking::Client, access_token: &str) {
+    let mut body: PlaylistList = get_playlist(&client, &access_token, Option::None);
 
     println!("{body}");
 
     while let Some(page_token) = &body.next_page_token {
-        body = client.get("https://www.googleapis.com/youtube/v3/playlists")
-            .header("Authorization", format!("Bearer {access_token}"))
-            .query(&[
-                ("part", "snippet"),
-                ("mine", "true"),
-                ("pageToken", &page_token),
-            ])
-            .send().unwrap().json().unwrap();
+        body = get_playlist(&client, &access_token, Some(page_token));
         println!("{body}");
     }
 }
