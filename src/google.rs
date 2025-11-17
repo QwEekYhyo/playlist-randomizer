@@ -13,6 +13,44 @@ struct GogolResponse {
     pub token_type: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PlaylistList {
+    pub next_page_token: Option<String>,
+    pub page_info: PlaylistPageInfo,
+    pub items: Vec<Playlist>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PlaylistPageInfo {
+    pub total_results: usize,
+    pub results_per_page: usize,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Playlist {
+    pub id: String,
+    pub snippet: PlaylistSnippet,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PlaylistSnippet {
+    pub title: String,
+}
+
+impl std::fmt::Display for PlaylistList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for playlist in &self.items {
+            write!(f, "Playlist Title: {}\n", playlist.snippet.title)?;
+        }
+
+        Ok(())
+    }
+}
+
 pub fn perform_oauth(client: &reqwest::blocking::Client) -> String {
     let client_id = env::var("CLIENT_ID").unwrap();
     let client_secret = env::var("CLIENT_SECRET").unwrap();
@@ -103,4 +141,28 @@ pub fn perform_oauth(client: &reqwest::blocking::Client) -> String {
         .unwrap();
 
     body.access_token
+}
+
+pub fn retreive_playlists(client: &reqwest::blocking::Client, access_token: &str) {
+    let mut body: PlaylistList = client.get("https://www.googleapis.com/youtube/v3/playlists")
+        .header("Authorization", format!("Bearer {access_token}"))
+        .query(&[
+            ("part", "snippet"),
+            ("mine", "true"),
+        ])
+        .send().unwrap().json().unwrap();
+
+    println!("{body}");
+
+    while let Some(page_token) = &body.next_page_token {
+        body = client.get("https://www.googleapis.com/youtube/v3/playlists")
+            .header("Authorization", format!("Bearer {access_token}"))
+            .query(&[
+                ("part", "snippet"),
+                ("mine", "true"),
+                ("pageToken", &page_token),
+            ])
+            .send().unwrap().json().unwrap();
+        println!("{body}");
+    }
 }

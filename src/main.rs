@@ -19,4 +19,6 @@ fn main() {
     };
 
     println!("access_token {access_token}");
+
+    google::retreive_playlists(&client, &access_token);
 }
