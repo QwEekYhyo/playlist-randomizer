@@ -51,6 +51,8 @@ impl std::fmt::Display for PlaylistList {
     }
 }
 
+const PLAYLIST_URL: &str = "https://www.googleapis.com/youtube/v3/playlists";
+
 pub fn perform_oauth(client: &reqwest::blocking::Client) -> String {
     let client_id = env::var("CLIENT_ID").unwrap();
     let client_secret = env::var("CLIENT_SECRET").unwrap();
@@ -63,7 +65,6 @@ pub fn perform_oauth(client: &reqwest::blocking::Client) -> String {
     let redirect_uri = format!("http://{}", server_uri);
     let auth_url = "https://accounts.google.com/o/oauth2/v2/auth";
     let token_url = "https://oauth2.googleapis.com/token";
-
 
     let code_verifier: String = rand::rng()
         .sample_iter(&Alphanumeric)
@@ -151,17 +152,25 @@ struct GetPlaylistParams<'a> {
     pub page_token: Option<&'a str>,
 }
 
-fn get_playlist(client: &reqwest::blocking::Client, access_token: &str, page_token: Option<&str>) -> PlaylistList {
+fn get_playlist(
+    client: &reqwest::blocking::Client,
+    access_token: &str,
+    page_token: Option<&str>,
+) -> PlaylistList {
     let params = GetPlaylistParams {
         part: "snippet",
         mine: "true",
         page_token,
     };
 
-    client.get("https://www.googleapis.com/youtube/v3/playlists")
+    client
+        .get(PLAYLIST_URL)
         .header("Authorization", format!("Bearer {access_token}"))
         .query(&params)
-        .send().unwrap().json().unwrap()
+        .send()
+        .unwrap()
+        .json()
+        .unwrap()
 }
 
 pub fn retreive_playlists(client: &reqwest::blocking::Client, access_token: &str) {

@@ -14,8 +14,8 @@ fn main() {
             let token = google::perform_oauth(&client);
             keyring_entry.set_password(&token).unwrap();
             token
-        },
-        Err(e) => Err(e).unwrap()
+        }
+        Err(e) => Err(e).unwrap(),
     };
 
     println!("access_token {access_token}");
