@@ -1,4 +1,5 @@
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+use color_eyre::{Result, eyre::eyre};
 use rand::{Rng, distr::Alphanumeric};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -11,6 +12,7 @@ struct GogolResponse {
     pub expires_in: u64,
     pub scope: String,
     pub token_type: String,
+    pub refresh_token: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -52,8 +54,28 @@ impl std::fmt::Display for PlaylistList {
 }
 
 const PLAYLIST_URL: &str = "https://www.googleapis.com/youtube/v3/playlists";
+const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 
-pub fn perform_oauth(client: &reqwest::blocking::Client) -> String {
+pub fn refresh_access_token(client: &reqwest::blocking::Client, refresh_token: &str) -> Result<String> {
+    let client_id = env::var("CLIENT_ID").unwrap();
+    let client_secret = env::var("CLIENT_SECRET").unwrap();
+
+    let mut form = std::collections::HashMap::new();
+    form.insert("client_id", client_id.as_str());
+    form.insert("client_secret", client_secret.as_str());
+    form.insert("grant_type", "refresh_token");
+    form.insert("refresh_token", refresh_token);
+
+    let body: GogolResponse = client
+        .post(TOKEN_URL)
+        .form(&form)
+        .send()?
+        .json()?;
+
+    Ok(body.access_token)
+}
+
+pub fn perform_oauth(client: &reqwest::blocking::Client) -> (String, String) {
     let client_id = env::var("CLIENT_ID").unwrap();
     let client_secret = env::var("CLIENT_SECRET").unwrap();
     let scopes = [
@@ -64,7 +86,6 @@ pub fn perform_oauth(client: &reqwest::blocking::Client) -> String {
     let server_uri = "127.0.0.1:8080";
     let redirect_uri = format!("http://{}", server_uri);
     let auth_url = "https://accounts.google.com/o/oauth2/v2/auth";
-    let token_url = "https://oauth2.googleapis.com/token";
 
     let code_verifier: String = rand::rng()
         .sample_iter(&Alphanumeric)
@@ -93,6 +114,8 @@ pub fn perform_oauth(client: &reqwest::blocking::Client) -> String {
         .append_pair("scope", &scopes.join(" "))
         .append_pair("code_challenge", &code_challenge)
         .append_pair("code_challenge_method", "S256")
+        .append_pair("access_type", "offline")
+        .append_pair("prompt", "consent")
         .append_pair("state", &state);
 
     println!("Open this URL in your browser: {}", url);
@@ -134,14 +157,18 @@ pub fn perform_oauth(client: &reqwest::blocking::Client) -> String {
     form.insert("code_verifier", &code_verifier);
 
     let body: GogolResponse = client
-        .post(token_url)
+        .post(TOKEN_URL)
         .form(&form)
         .send()
         .unwrap()
         .json()
         .unwrap();
 
-    body.access_token
+    if body.refresh_token.is_none() {
+        panic!("Google are assholes and did not provide a refresh token");
+    }
+
+    (body.access_token, body.refresh_token.unwrap())
 }
 
 #[derive(Debug, Serialize)]
@@ -156,30 +183,34 @@ fn get_playlist(
     client: &reqwest::blocking::Client,
     access_token: &str,
     page_token: Option<&str>,
-) -> PlaylistList {
+) -> Result<PlaylistList> {
     let params = GetPlaylistParams {
         part: "snippet",
         mine: "true",
         page_token,
     };
 
-    client
+    let response = client
         .get(PLAYLIST_URL)
         .header("Authorization", format!("Bearer {access_token}"))
         .query(&params)
-        .send()
-        .unwrap()
-        .json()
-        .unwrap()
+        .send()?;
+
+    if response.status() == reqwest::StatusCode::UNAUTHORIZED {
+        Err(eyre!("Need to refresh the access token"))
+    } else {
+        Ok(response.json()?)
+    }
 }
 
-pub fn retreive_playlists(client: &reqwest::blocking::Client, access_token: &str) {
-    let mut body: PlaylistList = get_playlist(&client, &access_token, Option::None);
-
+pub fn retreive_playlists(client: &reqwest::blocking::Client, access_token: &str) -> Result<()> {
+    let mut body = get_playlist(&client, &access_token, Option::None)?;
     println!("{body}");
 
     while let Some(page_token) = &body.next_page_token {
-        body = get_playlist(&client, &access_token, Some(page_token));
+        body = get_playlist(&client, &access_token, Some(page_token))?; // This shouldn't error
         println!("{body}");
     }
+
+    Ok(())
 }
