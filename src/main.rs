@@ -29,7 +29,9 @@ fn main() {
             if let Ok(access_token) = google::refresh_access_token(&client, &refresh_token) {
                 keyring_entry.set_password(&access_token).unwrap();
 
-                google::retreive_playlists(&client, &access_token).unwrap();
+                let playlists = google::retreive_playlists(&client, &access_token).unwrap();
+
+                println!("Found {} playlists", playlists.len());
             }
         }
     }

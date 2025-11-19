@@ -32,7 +32,7 @@ struct PlaylistPageInfo {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct Playlist {
+pub struct Playlist {
     pub id: String,
     pub snippet: PlaylistSnippet,
 }
@@ -203,14 +203,20 @@ fn get_playlist(
     }
 }
 
-pub fn retreive_playlists(client: &reqwest::blocking::Client, access_token: &str) -> Result<()> {
+pub fn retreive_playlists(client: &reqwest::blocking::Client, access_token: &str) -> Result<Vec<Playlist>> {
     let mut body = get_playlist(&client, &access_token, Option::None)?;
     println!("{body}");
 
+    let mut playlists = Vec::new();
+    playlists.append(&mut body.items);
+
     while let Some(page_token) = &body.next_page_token {
-        body = get_playlist(&client, &access_token, Some(page_token))?; // This shouldn't error
+        // get_playlist below shouldn't error
+        // unless of course we lost internet connection between requests
+        body = get_playlist(&client, &access_token, Some(page_token))?;
         println!("{body}");
+        playlists.append(&mut body.items);
     }
 
-    Ok(())
+    Ok(playlists)
 }
