@@ -27,13 +27,18 @@ fn main() {
     let playlists = match google::retreive_playlists(&client, &access_token) {
         Ok(playlists) => playlists,
         Err(_) => {
-            let refresh_token = Entry::new("yt-randomizer", "refresh").unwrap().get_password().unwrap();
+            let refresh_token = Entry::new("yt-randomizer", "refresh")
+                .unwrap()
+                .get_password()
+                .unwrap();
             if let Ok(access_token) = google::refresh_access_token(&client, &refresh_token) {
                 keyring_entry.set_password(&access_token).unwrap();
 
                 google::retreive_playlists(&client, &access_token).unwrap()
             } else {
-                panic!("Error trying to refresh access token which needs to be handled and will probably be in the near future");
+                panic!(
+                    "Error trying to refresh access token which needs to be handled and will probably be in the near future"
+                );
             }
         }
     };
@@ -53,6 +58,9 @@ fn main() {
     // TODO: watchout for 0
     let index: usize = input.trim().parse().expect("Input is not a valid number");
 
-    let chosen_playlist = &playlists[index-1];
-    println!("Chose {}, with id: {}", chosen_playlist.snippet.title, chosen_playlist.id);
+    let chosen_playlist = &playlists[index - 1];
+    println!(
+        "Chose {}, with id: {}",
+        chosen_playlist.snippet.title, chosen_playlist.id
+    );
 }

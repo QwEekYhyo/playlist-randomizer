@@ -66,7 +66,10 @@ fn print_playlist_subset(playlist_list: &PlaylistList, index: &mut usize) {
 const PLAYLIST_URL: &str = "https://www.googleapis.com/youtube/v3/playlists";
 const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 
-pub fn refresh_access_token(client: &reqwest::blocking::Client, refresh_token: &str) -> Result<String> {
+pub fn refresh_access_token(
+    client: &reqwest::blocking::Client,
+    refresh_token: &str,
+) -> Result<String> {
     let client_id = env::var("CLIENT_ID").unwrap();
     let client_secret = env::var("CLIENT_SECRET").unwrap();
 
@@ -76,11 +79,7 @@ pub fn refresh_access_token(client: &reqwest::blocking::Client, refresh_token: &
     form.insert("grant_type", "refresh_token");
     form.insert("refresh_token", refresh_token);
 
-    let body: GogolResponse = client
-        .post(TOKEN_URL)
-        .form(&form)
-        .send()?
-        .json()?;
+    let body: GogolResponse = client.post(TOKEN_URL).form(&form).send()?.json()?;
 
     Ok(body.access_token)
 }
@@ -216,7 +215,10 @@ fn get_playlist(
 // This also prints them
 // Also there is a "weak binding" between indices in the resulting Vec and the ones shown by the
 // print that relies on the fact that Vec::append preserves the order of elements
-pub fn retreive_playlists(client: &reqwest::blocking::Client, access_token: &str) -> Result<Vec<Playlist>> {
+pub fn retreive_playlists(
+    client: &reqwest::blocking::Client,
+    access_token: &str,
+) -> Result<Vec<Playlist>> {
     let mut body = get_playlist(&client, &access_token, Option::None)?;
     let mut index = 1;
 
