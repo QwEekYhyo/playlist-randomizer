@@ -39,10 +39,13 @@ pub struct Playlist {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct PlaylistSnippet {
+pub struct PlaylistSnippet {
     pub title: String,
 }
 
+// I used this for convenience, it's not used anymore because
+// I need to also display the index in the TOTAL list of playlist
+// not just in the subset of the Google "page"
 impl std::fmt::Display for PlaylistList {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for playlist in &self.items {
@@ -50,6 +53,13 @@ impl std::fmt::Display for PlaylistList {
         }
 
         Ok(())
+    }
+}
+
+fn print_playlist_subset(playlist_list: &PlaylistList, index: &mut usize) {
+    for playlist in &playlist_list.items {
+        println!("{}. {}", index, playlist.snippet.title);
+        *index += 1;
     }
 }
 
@@ -203,9 +213,14 @@ fn get_playlist(
     }
 }
 
+// This also prints them
+// Also there is a "weak binding" between indices in the resulting Vec and the ones shown by the
+// print that relies on the fact that Vec::append preserves the order of elements
 pub fn retreive_playlists(client: &reqwest::blocking::Client, access_token: &str) -> Result<Vec<Playlist>> {
     let mut body = get_playlist(&client, &access_token, Option::None)?;
-    println!("{body}");
+    let mut index = 1;
+
+    print_playlist_subset(&body, &mut index);
 
     let mut playlists = Vec::new();
     playlists.append(&mut body.items);
@@ -214,7 +229,7 @@ pub fn retreive_playlists(client: &reqwest::blocking::Client, access_token: &str
         // get_playlist below shouldn't error
         // unless of course we lost internet connection between requests
         body = get_playlist(&client, &access_token, Some(page_token))?;
-        println!("{body}");
+        print_playlist_subset(&body, &mut index);
         playlists.append(&mut body.items);
     }
 
