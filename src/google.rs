@@ -43,18 +43,28 @@ struct PlaylistPageInfo {
     pub results_per_page: usize,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PlaylistItem {
     pub id: String,
     pub snippet: PlaylistItemSnippet,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PlaylistItemSnippet {
+    #[serde(skip_serializing)]
     pub title: String,
-    pub position: u64,
+    pub position: usize,
+    pub playlist_id: String,
+    pub resource_id: PlaylistItemResourceId,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PlaylistItemResourceId {
+    pub kind: String,
+    pub video_id: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -294,9 +304,27 @@ pub fn shuffle_playlist(
 
     println!("{body}");
 
+    // I don't know if this is the most efficient way to do it as I am iterating all elements
+    // afterwards to set their position and perform the update request
     body.items.shuffle(&mut rand::rng());
 
     println!("{body}");
+
+    // Apply new positions
+    for (pos, playlist_item) in body.items.iter_mut().enumerate() {
+        playlist_item.snippet.position = pos;
+        let response = client
+            .put(PLAYLIST_ITEMS_URL)
+            .header("Authorization", format!("Bearer {access_token}"))
+            .query(&[("part", "snippet")])
+            .json(playlist_item)
+            .send();
+
+        match response {
+            Ok(_) => println!("Item updated"),
+            Err(_) => println!("Error while updating"),
+        }
+    }
 
     Ok(())
 }
