@@ -80,7 +80,11 @@ impl std::fmt::Display for PlaylistItemList {
         write!(f, "Here are the items in the playlist\n")?;
 
         for (index, playlist_item) in self.items.iter().enumerate() {
-            write!(f, "{}. {}", playlist_item.snippet.position, playlist_item.snippet.title)?;
+            write!(
+                f,
+                "{}. {}",
+                playlist_item.snippet.position, playlist_item.snippet.title
+            )?;
             if index != self.page_info.total_results - 1 {
                 write!(f, "\n")?;
             }
@@ -110,9 +114,9 @@ fn print_playlist_subset(playlist_list: &PlaylistList, index: &mut usize) {
     }
 }
 
-const PLAYLIST_URL: &str       = "https://www.googleapis.com/youtube/v3/playlists";
+const PLAYLIST_URL: &str = "https://www.googleapis.com/youtube/v3/playlists";
 const PLAYLIST_ITEMS_URL: &str = "https://www.googleapis.com/youtube/v3/playlistItems";
-const TOKEN_URL: &str          = "https://oauth2.googleapis.com/token";
+const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 
 pub fn refresh_access_token(
     client: &reqwest::blocking::Client,
@@ -289,9 +293,9 @@ pub fn retreive_playlists(
 pub fn shuffle_playlist(
     client: &reqwest::blocking::Client,
     access_token: &str,
-    playlist: &Playlist
+    playlist: &Playlist,
 ) -> Result<()> {
-    let mut body : PlaylistItemList = client
+    let mut body: PlaylistItemList = client
         .get(PLAYLIST_ITEMS_URL)
         .header("Authorization", format!("Bearer {access_token}"))
         .query(&[
