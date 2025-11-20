@@ -10,7 +10,7 @@ fn main() {
 
     dotenvy::dotenv().unwrap();
 
-    let access_token = match keyring_entry.get_password() {
+    let mut access_token = match keyring_entry.get_password() {
         Ok(p) => p,
         Err(NoEntry) => {
             let (token, refresh_token) = google::perform_oauth(&client);
@@ -31,9 +31,11 @@ fn main() {
                 .unwrap()
                 .get_password()
                 .unwrap();
-            if let Ok(access_token) = google::refresh_access_token(&client, &refresh_token) {
-                keyring_entry.set_password(&access_token).unwrap();
 
+            if let Ok(new_access_token) = google::refresh_access_token(&client, &refresh_token) {
+                keyring_entry.set_password(&new_access_token).unwrap();
+
+                access_token = new_access_token;
                 google::retreive_playlists(&client, &access_token).unwrap()
             } else {
                 panic!(
@@ -63,4 +65,6 @@ fn main() {
         "Chose {}, with id: {}",
         chosen_playlist.snippet.title, chosen_playlist.id
     );
+
+    google::shuffle_playlist(&client, &access_token, chosen_playlist).unwrap();
 }

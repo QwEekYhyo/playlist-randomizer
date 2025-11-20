@@ -1,6 +1,6 @@
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use color_eyre::{Result, eyre::eyre};
-use rand::{Rng, distr::Alphanumeric};
+use rand::{Rng, distr::Alphanumeric, seq::SliceRandom};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::env;
@@ -13,6 +13,19 @@ struct GogolResponse {
     pub scope: String,
     pub token_type: String,
     pub refresh_token: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Playlist {
+    pub id: String,
+    pub snippet: PlaylistSnippet,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlaylistSnippet {
+    pub title: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -32,15 +45,39 @@ struct PlaylistPageInfo {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Playlist {
+struct PlaylistItem {
     pub id: String,
-    pub snippet: PlaylistSnippet,
+    pub snippet: PlaylistItemSnippet,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PlaylistSnippet {
+struct PlaylistItemSnippet {
     pub title: String,
+    pub position: u64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PlaylistItemList {
+    pub next_page_token: Option<String>,
+    pub page_info: PlaylistPageInfo,
+    pub items: Vec<PlaylistItem>,
+}
+
+impl std::fmt::Display for PlaylistItemList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Here are the items in the playlist\n")?;
+
+        for (index, playlist_item) in self.items.iter().enumerate() {
+            write!(f, "{}. {}", playlist_item.snippet.position, playlist_item.snippet.title)?;
+            if index != self.page_info.total_results - 1 {
+                write!(f, "\n")?;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 // I used this for convenience, it's not used anymore because
@@ -63,8 +100,9 @@ fn print_playlist_subset(playlist_list: &PlaylistList, index: &mut usize) {
     }
 }
 
-const PLAYLIST_URL: &str = "https://www.googleapis.com/youtube/v3/playlists";
-const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
+const PLAYLIST_URL: &str       = "https://www.googleapis.com/youtube/v3/playlists";
+const PLAYLIST_ITEMS_URL: &str = "https://www.googleapis.com/youtube/v3/playlistItems";
+const TOKEN_URL: &str          = "https://oauth2.googleapis.com/token";
 
 pub fn refresh_access_token(
     client: &reqwest::blocking::Client,
@@ -236,4 +274,29 @@ pub fn retreive_playlists(
     }
 
     Ok(playlists)
+}
+
+pub fn shuffle_playlist(
+    client: &reqwest::blocking::Client,
+    access_token: &str,
+    playlist: &Playlist
+) -> Result<()> {
+    let mut body : PlaylistItemList = client
+        .get(PLAYLIST_ITEMS_URL)
+        .header("Authorization", format!("Bearer {access_token}"))
+        .query(&[
+            ("part", "snippet"),
+            ("playlistId", &playlist.id),
+            ("maxResults", "50"),
+        ])
+        .send()?
+        .json()?;
+
+    println!("{body}");
+
+    body.items.shuffle(&mut rand::rng());
+
+    println!("{body}");
+
+    Ok(())
 }
