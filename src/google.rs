@@ -172,8 +172,13 @@ impl GogolClient {
             "https://www.googleapis.com/auth/youtube",
             "https://www.googleapis.com/auth/youtube.force-ssl",
         ];
-        let server_uri = "127.0.0.1:8080";
-        let redirect_uri = format!("http://{}", server_uri);
+        let server_uri = if env::var("IN_DOCKER").is_ok() {
+            println!("IN DOCKEERRRRR");
+            "0.0.0.0:8080"
+        } else {
+            "127.0.0.1:8080"
+        };
+        let redirect_uri = "http://127.0.0.1:8080";
         let auth_url = "https://accounts.google.com/o/oauth2/v2/auth";
 
         let code_verifier: String = rand::rng()

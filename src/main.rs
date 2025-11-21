@@ -6,40 +6,52 @@ use color_eyre::eyre::{Context, bail};
 use keyring::{Entry, Error::NoEntry};
 
 fn main() -> color_eyre::Result<()> {
+    // This shouldn't error
     color_eyre::install()?;
 
     dotenvy::dotenv().ok();
 
-    let keyring_entry = Entry::new("yt-randomizer", "access").unwrap();
+    // This shouldn't error
+    let keyring_entry = Entry::new("yt-randomizer", "access")?;
+
     let client = google::GogolClient::new().wrap_err("Cannot create Google Client")?;
 
     let mut access_token = match keyring_entry.get_password() {
         Ok(p) => p,
-        Err(NoEntry) => {
+        Err(e) => {
             let (token, refresh_token) = client.perform_oauth();
-            keyring_entry.set_password(&token).unwrap();
-            let keyring_entry_refresh = Entry::new("yt-randomizer", "refresh").unwrap();
-            keyring_entry_refresh.set_password(&refresh_token).unwrap();
+
+            if matches!(e, NoEntry) {
+                keyring_entry.set_password(&token).unwrap();
+                let keyring_entry_refresh =
+                    Entry::new("yt-randomizer", "refresh").wrap_err("Could not access keyrings")?;
+                keyring_entry_refresh.set_password(&refresh_token).unwrap();
+            } else {
+                println!(
+                    "Warning: could not access keyring, tokens will not be stored between sessions"
+                );
+            }
+
             token
         }
-        Err(e) => Err(e).unwrap(),
     };
 
     println!("access_token {access_token}");
 
     let playlists = match client.retreive_playlists(&access_token) {
         Ok(playlists) => playlists,
+        // TODO: Only do this when error really is UNAUTHORIZED
         Err(_) => {
             let refresh_token = Entry::new("yt-randomizer", "refresh")
-                .unwrap()
+                ?
                 .get_password()
-                .unwrap();
+                .wrap_err("Error accessing keyring, if you are using the app without it please restart to get a new access token")?;
 
             if let Ok(new_access_token) = client.refresh_access_token(&refresh_token) {
-                keyring_entry.set_password(&new_access_token).unwrap();
+                keyring_entry.set_password(&new_access_token)?;
 
                 access_token = new_access_token;
-                client.retreive_playlists(&access_token).unwrap()
+                client.retreive_playlists(&access_token)?
             } else {
                 bail!(
                     "Error trying to refresh access token which needs to be handled and will probably be in the near future"
