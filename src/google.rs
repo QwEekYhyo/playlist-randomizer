@@ -3,6 +3,7 @@ use color_eyre::{
     Result,
     eyre::{Context, eyre},
 };
+use is_docker::is_docker;
 use rand::{Rng, distr::Alphanumeric, seq::SliceRandom};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -172,8 +173,7 @@ impl GogolClient {
             "https://www.googleapis.com/auth/youtube",
             "https://www.googleapis.com/auth/youtube.force-ssl",
         ];
-        let server_uri = if env::var("IN_DOCKER").is_ok() {
-            println!("IN DOCKEERRRRR");
+        let server_uri = if is_docker() {
             "0.0.0.0:8080"
         } else {
             "127.0.0.1:8080"
@@ -213,6 +213,7 @@ impl GogolClient {
             .append_pair("state", &state);
 
         println!("Open this URL in your browser: {}", url);
+        let _ = open::that(url.as_str());
 
         let server = tiny_http::Server::http(server_uri).unwrap();
 
