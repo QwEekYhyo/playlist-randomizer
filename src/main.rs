@@ -5,11 +5,34 @@ use std::io::Write;
 use color_eyre::eyre::{Context, bail};
 use keyring::{Entry, Error::NoEntry};
 
+fn clear_stored_tokens() -> color_eyre::Result<()> {
+    let access_token_entry = Entry::new("yt-randomizer", "access")?;
+    let refresh_token_entry = Entry::new("yt-randomizer", "refresh")?;
+
+    // TODO: revoke token
+
+    for entry in [access_token_entry, refresh_token_entry] {
+        if entry.delete_credential().is_ok() {
+            println!("Successfully cleared token");
+        } else {
+            println!("Tried to clear unexisting token");
+        }
+    }
+
+    Ok(())
+}
+
 fn main() -> color_eyre::Result<()> {
     // This shouldn't error
     color_eyre::install()?;
 
     dotenvy::dotenv().ok();
+
+    let mut args = std::env::args().skip(1);
+    if let Some(cmd) = args.next() && cmd == "clear" {
+        clear_stored_tokens()?;
+        return Ok(());
+    }
 
     // This shouldn't error
     let keyring_entry = Entry::new("yt-randomizer", "access")?;
