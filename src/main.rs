@@ -3,6 +3,7 @@ mod google;
 use std::io::Write;
 
 use color_eyre::eyre::{Context, bail};
+use colored::Colorize;
 use keyring::{Entry, Error::NoEntry};
 
 fn clear_stored_tokens() -> color_eyre::Result<()> {
@@ -92,7 +93,12 @@ fn main() -> color_eyre::Result<()> {
 
     let mut input = String::new();
 
-    println!("[IMPORTANT] Make sure the playlist you choose is manually sorted");
+    println!(
+        "{}",
+        "[IMPORTANT] Make sure the playlist you choose is manually sorted"
+            .red()
+            .bold()
+    );
     print!("Please enter a playlist number [1-{}]: ", playlists.len());
     std::io::stdout().flush();
 
