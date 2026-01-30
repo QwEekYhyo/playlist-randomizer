@@ -29,7 +29,9 @@ fn main() -> color_eyre::Result<()> {
     dotenvy::dotenv().ok();
 
     let mut args = std::env::args().skip(1);
-    if let Some(cmd) = args.next() && cmd == "clear" {
+    if let Some(cmd) = args.next()
+        && cmd == "clear"
+    {
         clear_stored_tokens()?;
         return Ok(());
     }
