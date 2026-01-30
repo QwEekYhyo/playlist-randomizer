@@ -311,7 +311,9 @@ impl GogolClient {
         Ok(playlists)
     }
 
+    // This function needs some refactoring and some error handling/ignoring
     pub fn shuffle_playlist(&self, access_token: &str, playlist: &Playlist) -> Result<()> {
+        // First request
         let mut body: PlaylistItemList = self
             .http_client
             .get(PLAYLIST_ITEMS_URL)
@@ -326,14 +328,36 @@ impl GogolClient {
 
         println!("{body}");
 
+        let mut playlist_items = Vec::new();
+        playlist_items.append(&mut body.items);
+
+        while let Some(page_token) = &body.next_page_token {
+            body = self
+                .http_client
+                .get(PLAYLIST_ITEMS_URL)
+                .header("Authorization", format!("Bearer {access_token}"))
+                .query(&[
+                    ("part", "snippet"),
+                    ("playlistId", &playlist.id),
+                    ("maxResults", "50"),
+                    ("pageToken", page_token),
+                ])
+                .send()?
+                .json()?;
+
+            // Because I am using this to print the list it will appear
+            // as multiple playlists of 50 elements each if there are more than that in the playlist
+            println!("{body}");
+
+            playlist_items.append(&mut body.items);
+        }
+
         // I don't know if this is the most efficient way to do it as I am iterating all elements
         // afterwards to set their position and perform the update request
-        body.items.shuffle(&mut rand::rng());
-
-        println!("{body}");
+        playlist_items.shuffle(&mut rand::rng());
 
         // Apply new positions
-        for (pos, playlist_item) in body.items.iter_mut().enumerate() {
+        for (pos, playlist_item) in playlist_items.iter_mut().enumerate() {
             playlist_item.snippet.position = pos;
             let response = self
                 .http_client

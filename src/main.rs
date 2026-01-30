@@ -42,6 +42,8 @@ fn main() -> color_eyre::Result<()> {
     let mut access_token = match keyring_entry.get_password() {
         Ok(p) => p,
         Err(e) => {
+            // TODO: test if we can actually access keyring BEFORE that
+            // and at least warn the user, maybe ask if they want to try again?
             let (token, refresh_token) = client.perform_oauth();
 
             if matches!(e, NoEntry) {
@@ -88,6 +90,7 @@ fn main() -> color_eyre::Result<()> {
 
     let mut input = String::new();
 
+    println!("[IMPORTANT] Make sure the playlist you choose is manually sorted");
     print!("Please enter a playlist number [1-{}]: ", playlists.len());
     std::io::stdout().flush();
 
