@@ -1,24 +1,27 @@
+mod args;
 mod google;
 
 use std::io::Write;
 
+use clap::Parser;
 use color_eyre::eyre::{Context, bail};
 use colored::Colorize;
 use keyring::{Entry, Error::NoEntry};
 
-fn clear_stored_tokens(client: &google::GogolClient) -> color_eyre::Result<()> {
+fn clear_stored_tokens(client: &google::GogolClient, forced: bool) -> color_eyre::Result<()> {
     let access_token_entry = Entry::new("yt-randomizer", "access")?;
     let refresh_token_entry = Entry::new("yt-randomizer", "refresh")?;
 
     for entry in [access_token_entry, refresh_token_entry] {
         if let Ok(token) = entry.get_password() {
-            match client.revoke_token(&token) {
-                Ok(_) => {
-                    if entry.delete_credential().is_ok() {
-                        println!("Successfully cleared token");
-                    }
+            let res = client.revoke_token(&token);
+
+            if forced || res.is_ok() {
+                if entry.delete_credential().is_ok() {
+                    println!("Successfully cleared token");
                 }
-                Err(err) => eprintln!("{:?}", err.wrap_err("could not revoke token")),
+            } else if let Err(err) = res {
+                eprintln!("{:?}", err.wrap_err("could not revoke token"));
             }
         }
     }
@@ -34,12 +37,15 @@ fn main() -> color_eyre::Result<()> {
 
     let client = google::GogolClient::new().wrap_err("Cannot create Google Client")?;
 
-    let mut args = std::env::args().skip(1);
-    if let Some(cmd) = args.next()
-        && cmd == "clear"
-    {
-        clear_stored_tokens(&client)?;
-        return Ok(());
+    let clap_args = crate::args::Args::parse();
+
+    if let Some(cmd) = clap_args.command {
+        match cmd {
+            args::Commands::Clear { force } => {
+                clear_stored_tokens(&client, force)?;
+                return Ok(());
+            }
+        }
     }
 
     // This shouldn't error
