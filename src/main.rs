@@ -6,17 +6,20 @@ use color_eyre::eyre::{Context, bail};
 use colored::Colorize;
 use keyring::{Entry, Error::NoEntry};
 
-fn clear_stored_tokens() -> color_eyre::Result<()> {
+fn clear_stored_tokens(client: &google::GogolClient) -> color_eyre::Result<()> {
     let access_token_entry = Entry::new("yt-randomizer", "access")?;
     let refresh_token_entry = Entry::new("yt-randomizer", "refresh")?;
 
-    // TODO: revoke token
-
     for entry in [access_token_entry, refresh_token_entry] {
-        if entry.delete_credential().is_ok() {
-            println!("Successfully cleared token");
-        } else {
-            println!("Tried to clear unexisting token");
+        if let Ok(token) = entry.get_password() {
+            match client.revoke_token(&token) {
+                Ok(_) => {
+                    if entry.delete_credential().is_ok() {
+                        println!("Successfully cleared token");
+                    }
+                }
+                Err(err) => eprintln!("{:?}", err.wrap_err("could not revoke token")),
+            }
         }
     }
 
@@ -29,18 +32,18 @@ fn main() -> color_eyre::Result<()> {
 
     dotenvy::dotenv().ok();
 
+    let client = google::GogolClient::new().wrap_err("Cannot create Google Client")?;
+
     let mut args = std::env::args().skip(1);
     if let Some(cmd) = args.next()
         && cmd == "clear"
     {
-        clear_stored_tokens()?;
+        clear_stored_tokens(&client)?;
         return Ok(());
     }
 
     // This shouldn't error
     let keyring_entry = Entry::new("yt-randomizer", "access")?;
-
-    let client = google::GogolClient::new().wrap_err("Cannot create Google Client")?;
 
     let mut access_token = match keyring_entry.get_password() {
         Ok(p) => p,

@@ -148,6 +148,7 @@ fn print_playlist_subset(playlist_list: &PlaylistList, index: &mut usize) {
 const PLAYLIST_URL: &str = "https://www.googleapis.com/youtube/v3/playlists";
 const PLAYLIST_ITEMS_URL: &str = "https://www.googleapis.com/youtube/v3/playlistItems";
 const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
+const REVOCATION_URL: &str = "https://oauth2.googleapis.com/revoke";
 
 impl GogolClient {
     pub fn refresh_access_token(&self, refresh_token: &str) -> Result<String> {
@@ -165,6 +166,15 @@ impl GogolClient {
             .json()?;
 
         Ok(body.access_token)
+    }
+
+    pub fn revoke_token(&self, token: &str) -> Result<reqwest::blocking::Response> {
+        Ok(self
+            .http_client
+            .post(REVOCATION_URL)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .query(&[("token", token)])
+            .send()?)
     }
 
     pub fn perform_oauth(&self) -> (String, String) {
