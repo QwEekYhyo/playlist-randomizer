@@ -56,7 +56,7 @@ fn main() -> color_eyre::Result<()> {
         Err(e) => {
             // TODO: test if we can actually access keyring BEFORE that
             // and at least warn the user, maybe ask if they want to try again?
-            let (token, refresh_token) = client.perform_oauth();
+            let (token, refresh_token) = client.perform_oauth().wrap_err("Cannot perform OAuth")?;
 
             if matches!(e, NoEntry) {
                 keyring_entry.set_password(&token).unwrap();

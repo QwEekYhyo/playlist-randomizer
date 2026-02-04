@@ -1,7 +1,7 @@
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use color_eyre::{
     Result,
-    eyre::{Context, eyre},
+    eyre::{Context, bail, eyre},
 };
 use is_docker::is_docker;
 use rand::{Rng, distr::Alphanumeric, seq::SliceRandom};
@@ -180,7 +180,7 @@ impl GogolClient {
             .send()?)
     }
 
-    pub fn perform_oauth(&self) -> (String, String) {
+    pub fn perform_oauth(&self) -> color_eyre::Result<(String, String)> {
         let scopes = [
             "https://www.googleapis.com/auth/youtubepartner",
             "https://www.googleapis.com/auth/youtube",
@@ -228,10 +228,14 @@ impl GogolClient {
         println!("Open this URL in your browser: {}", url);
         let _ = open::that(url.as_str());
 
-        let server = tiny_http::Server::http(server_uri).unwrap();
+        let server = tiny_http::Server::http(server_uri)
+            .map_err(|e| eyre!("{}", e.to_string()))
+            .wrap_err_with(|| format!("cannot listen on {server_uri}"))?;
 
         let (returned_state, code) = loop {
-            let request = server.recv().unwrap();
+            let Ok(request) = server.recv() else {
+                continue;
+            };
 
             let url = Url::parse(&format!("http://localhost{}", request.url())).unwrap();
             let code = url
@@ -250,8 +254,8 @@ impl GogolClient {
             }
         };
 
-        if returned_state.unwrap_or_default() != state {
-            panic!("We got fooled by CSRF!");
+        if returned_state != Some(state) {
+            bail!("We got fooled by CSRF!");
         }
 
         println!("Authorization code: {:?}", code);
@@ -269,15 +273,13 @@ impl GogolClient {
             .post(TOKEN_URL)
             .form(&form)
             .send()
-            .unwrap()
+            .wrap_err("cannot send request")?
             .json()
-            .unwrap();
+            .wrap_err("cannot parse response")?;
 
-        if body.refresh_token.is_none() {
-            panic!("Google are assholes and did not provide a refresh token");
-        }
-
-        (body.access_token, body.refresh_token.unwrap())
+        body.refresh_token
+            .ok_or_else(|| eyre!("Google did not provide a refresh token"))
+            .map(|refresh_token| (body.access_token, refresh_token))
     }
 
     fn get_playlist(&self, access_token: &str, page_token: Option<&str>) -> Result<PlaylistList> {
