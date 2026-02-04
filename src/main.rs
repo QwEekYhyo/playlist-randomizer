@@ -134,12 +134,11 @@ fn main() -> color_eyre::Result<()> {
 
         if index > 0 && index <= playlists.len() {
             break index;
-        } else {
-            println!(
-                "{}",
-                "Input is not valid, please enter a valid number.".red()
-            );
         }
+        println!(
+            "{}",
+            "Input is not valid, please enter a valid number.".red()
+        );
     };
 
     let chosen_playlist = &playlists[index - 1];
