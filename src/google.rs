@@ -204,8 +204,8 @@ impl GogolClient {
             URL_SAFE_NO_PAD.encode(hash)
         };
 
-        println!("code_verifier: {}", code_verifier);
-        println!("code_challenge: {:?}", code_challenge);
+        println!("code_verifier: {code_verifier}");
+        println!("code_challenge: {code_challenge:?}");
 
         let state: String = rand::rng()
             .sample_iter(&Alphanumeric)
@@ -225,7 +225,7 @@ impl GogolClient {
             .append_pair("prompt", "consent")
             .append_pair("state", &state);
 
-        println!("Open this URL in your browser: {}", url);
+        println!("Open this URL in your browser: {url}");
         let _ = open::that(url.as_str());
 
         let server = tiny_http::Server::http(server_uri)
@@ -258,7 +258,7 @@ impl GogolClient {
             bail!("We got fooled by CSRF!");
         }
 
-        println!("Authorization code: {:?}", code);
+        println!("Authorization code: {code:?}");
 
         let mut form = std::collections::HashMap::new();
         form.insert("code", code.as_str());
