@@ -4,7 +4,7 @@ mod google;
 use std::io::Write;
 
 use clap::Parser;
-use color_eyre::eyre::{Context, bail};
+use color_eyre::eyre::{Context, bail, eyre};
 use colored::Colorize;
 use keyring::{Entry, Error::NoEntry};
 
@@ -97,7 +97,17 @@ fn main() -> color_eyre::Result<()> {
         }
     };
 
-    // TODO: Handle 0 playlists
+    if playlists.len() == 0 {
+        println!(
+            "{}",
+            "[ERROR] No playlists found, make sure there are some on your YouTube account"
+                .red()
+                .bold()
+        );
+
+        return Err(eyre!("no playlists"));
+    }
+
     println!("Found {} playlists", playlists.len());
 
     let mut input = String::new();
