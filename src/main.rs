@@ -97,7 +97,7 @@ fn main() -> color_eyre::Result<()> {
         }
     };
 
-    if playlists.len() == 0 {
+    if playlists.is_empty() {
         println!(
             "{}",
             "[ERROR] No playlists found, make sure there are some on your YouTube account"

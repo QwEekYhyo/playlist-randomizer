@@ -29,6 +29,7 @@ impl GogolClient {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 struct GogolResponse {
     pub access_token: String,
@@ -51,6 +52,7 @@ pub struct PlaylistSnippet {
     pub title: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PlaylistList {
@@ -59,6 +61,7 @@ struct PlaylistList {
     pub items: Vec<Playlist>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PlaylistPageInfo {
@@ -100,7 +103,7 @@ struct PlaylistItemList {
 
 impl std::fmt::Display for PlaylistItemList {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Here are the items in the playlist\n")?;
+        writeln!(f, "Here are the items in the playlist")?;
 
         for (index, playlist_item) in self.items.iter().enumerate() {
             write!(
@@ -109,7 +112,7 @@ impl std::fmt::Display for PlaylistItemList {
                 playlist_item.snippet.position, playlist_item.snippet.title
             )?;
             if index != self.page_info.total_results - 1 {
-                write!(f, "\n")?;
+                writeln!(f)?;
             }
         }
 
@@ -123,7 +126,7 @@ impl std::fmt::Display for PlaylistItemList {
 impl std::fmt::Display for PlaylistList {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for playlist in &self.items {
-            write!(f, "Playlist Title: {}\n", playlist.snippet.title)?;
+            writeln!(f, "Playlist Title: {}", playlist.snippet.title)?;
         }
 
         Ok(())
@@ -213,7 +216,7 @@ impl GogolClient {
         let mut url = Url::parse(auth_url).unwrap();
         url.query_pairs_mut()
             .append_pair("client_id", &self.client_id)
-            .append_pair("redirect_uri", &redirect_uri)
+            .append_pair("redirect_uri", redirect_uri)
             .append_pair("response_type", "code")
             .append_pair("scope", &scopes.join(" "))
             .append_pair("code_challenge", &code_challenge)
@@ -257,7 +260,7 @@ impl GogolClient {
         form.insert("code", code.as_str());
         form.insert("client_id", &self.client_id);
         form.insert("client_secret", &self.client_secret);
-        form.insert("redirect_uri", &redirect_uri);
+        form.insert("redirect_uri", redirect_uri);
         form.insert("grant_type", "authorization_code");
         form.insert("code_verifier", &code_verifier);
 
@@ -302,7 +305,7 @@ impl GogolClient {
     // Also there is a "weak binding" between indices in the resulting Vec and the ones shown by the
     // print that relies on the fact that Vec::append preserves the order of elements
     pub fn retreive_playlists(&self, access_token: &str) -> Result<Vec<Playlist>> {
-        let mut body = self.get_playlist(&access_token, None)?;
+        let mut body = self.get_playlist(access_token, None)?;
         let mut index = 1;
 
         print_playlist_subset(&body, &mut index);
@@ -313,7 +316,7 @@ impl GogolClient {
         while let Some(page_token) = &body.next_page_token {
             // get_playlist below shouldn't error
             // unless of course we lost internet connection between requests
-            body = self.get_playlist(&access_token, Some(page_token))?;
+            body = self.get_playlist(access_token, Some(page_token))?;
             print_playlist_subset(&body, &mut index);
             playlists.append(&mut body.items);
         }
