@@ -110,23 +110,37 @@ fn main() -> color_eyre::Result<()> {
 
     println!("Found {} playlists", playlists.len());
 
-    let mut input = String::new();
-
     println!(
         "{}",
         "[IMPORTANT] Make sure the playlist you choose is manually sorted"
             .red()
             .bold()
     );
-    print!("Please enter a playlist number [1-{}]: ", playlists.len());
-    std::io::stdout().flush();
 
-    std::io::stdin()
-        .read_line(&mut input)
-        .expect("Error while reading line");
+    let mut input = String::new();
+    let index = loop {
+        print!("Please enter a playlist number [1-{}]: ", playlists.len());
+        std::io::stdout().flush()?;
 
-    // TODO: watchout for 0
-    let index: usize = input.trim().parse().expect("Input is not a valid number");
+        let n = std::io::stdin()
+            .read_line(&mut input)
+            .wrap_err("Error while reading line")?;
+
+        if n == 0 {
+            return Ok(());
+        }
+
+        let index: usize = input.trim().parse().unwrap_or(0);
+
+        if index > 0 && index <= playlists.len() {
+            break index;
+        } else {
+            println!(
+                "{}",
+                "Input is not valid, please enter a valid number.".red()
+            );
+        }
+    };
 
     let chosen_playlist = &playlists[index - 1];
     println!(
@@ -136,7 +150,7 @@ fn main() -> color_eyre::Result<()> {
 
     client
         .shuffle_playlist(&access_token, chosen_playlist)
-        .unwrap();
+        .wrap_err("could not shuffle playlist")?;
 
     Ok(())
 }
